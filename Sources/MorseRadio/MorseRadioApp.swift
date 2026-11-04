@@ -2,27 +2,31 @@ import AppKit
 import SwiftUI
 
 @main
-struct MorseRadioApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-
-    var body: some Scene {
-        // The app is managed by AppDelegate and the menu bar status item.
-        Settings {
-            EmptyView()
-        }
+enum MorseRadioApp {
+    static func main() {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        let delegate = AppDelegate()
+        app.delegate = delegate
+        app.run()
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let radio = RadioManager()
-    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let popover = NSPopover()
+    private var keyEventMonitor: Any?
+    private var isWaitingForSpace = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "dot.radiowaves.left.and.right", accessibilityDescription: "Morse Radio")
+            button.image = nil
+            button.title = "· —"
+            button.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .medium)
+            button.setAccessibilityLabel("Morse Radio, dot and dash")
             button.toolTip = "Morse Radio — 周波数 \(radio.frequency)"
             button.target = self
             button.action = #selector(statusItemClicked(_:))
@@ -45,6 +49,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSApplication.willResignActiveNotification,
             object: nil
         )
+
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp]) { [weak self] event in
+            guard let self, self.isWaitingForSpace, event.keyCode == 49 else { return event }
+            if event.type == .keyDown {
+                if !event.isARepeat { self.radio.beginLocalKey() }
+            } else {
+                self.radio.endLocalKey()
+            }
+            return nil
+        }
     }
 
     @objc private func statusItemClicked(_ sender: Any?) {
@@ -55,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if popover.isShown {
                 popover.performClose(nil)
             } else {
+                isWaitingForSpace = true
                 popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
                 NSApp.activate(ignoringOtherApps: true)
             }
@@ -99,10 +114,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func popoverDidClose() {
+        isWaitingForSpace = false
         radio.endLocalKey()
     }
 
     @objc private func appWillResignActive() {
+        isWaitingForSpace = false
         radio.endLocalKey()
     }
 
@@ -136,7 +153,7 @@ private struct RadioPopoverView: View {
                 Circle()
                     .fill(radio.peerNames.isEmpty ? Color.secondary.opacity(0.45) : Color.green)
                     .frame(width: 7, height: 7)
-                Text(radio.peerNames.isEmpty ? "同じ周波数の利用者を検索中" : "接続中: \(radio.peerNames.count)人")
+                Text(radio.peerNames.isEmpty ? "Space 待機中 · 同じ周波数を検索中" : "接続中: \(radio.peerNames.count)人")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

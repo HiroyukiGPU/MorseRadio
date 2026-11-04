@@ -3,13 +3,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="$ROOT/MorseRadio.app"
+APP_VERSION="${APP_VERSION:-1.1.0}"
 
 cd "$ROOT"
 swift build -c release
 
 mkdir -p "$APP/Contents/MacOS"
 cp ".build/release/MorseRadio" "$APP/Contents/MacOS/MorseRadio"
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -18,7 +19,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIdentifier</key><string>com.codex.MorseRadio</string>
     <key>CFBundleName</key><string>Morse Radio</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>1.0</string>
+    <key>CFBundleShortVersionString</key><string>$APP_VERSION</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>LSUIElement</key><true/>
     <key>NSLocalNetworkUsageDescription</key>
@@ -28,5 +29,6 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+xattr -cr "$APP"
 codesign --force --deep --sign - "$APP"
 echo "Built: $APP"

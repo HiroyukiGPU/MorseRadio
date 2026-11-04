@@ -63,7 +63,7 @@ final class MorseKeyView: NSView {
         path.lineWidth = isTransmitting ? 2 : 1
         path.stroke()
 
-        let label = isTransmitting ? "送信中… Space を離して終了" : "ここをクリックして Space を押す"
+        let label = isTransmitting ? "送信中… Space を離して終了" : "Space を押して送信"
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 13, weight: .medium),
             .foregroundColor: isTransmitting ? NSColor.controlAccentColor : NSColor.labelColor
