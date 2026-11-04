@@ -1,0 +1,5 @@
+.build/
+.DS_Store
+MorseRadio.app/
+MorseRadio-macOS.zip
+MorseRadio-Swift-source.zip
