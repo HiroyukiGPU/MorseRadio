@@ -5,12 +5,14 @@ import Combine
 private struct MorsePacket: Codable {
     let action: String
     let sender: String
+    let duration: TimeInterval?
 }
 
 final class RadioManager: NSObject, ObservableObject {
     @Published private(set) var frequency: String
     @Published private(set) var peerNames: [String] = []
     @Published private(set) var isSending = false
+    @Published private(set) var receivedMarks: [String] = []
 
     private let serviceType = "morse-radio"
     private let tone = MorseTonePlayer()
@@ -20,6 +22,10 @@ final class RadioManager: NSObject, ObservableObject {
     private var browser: MCNearbyServiceBrowser?
     private var invitedPeers = Set<MCPeerID>()
     private var localKeyIsDown = false
+    private var localKeyStartedAt: TimeInterval?
+    private var remoteKeyStartedAt: [String: TimeInterval] = [:]
+    private let dashThreshold: TimeInterval = 0.25
+    private let maxVisibleMarks = 8
 
     override init() {
         let saved = UserDefaults.standard.string(forKey: "radio.frequency") ?? "145.500"
@@ -36,6 +42,8 @@ final class RadioManager: NSObject, ObservableObject {
         guard value != frequency else { return true }
         endLocalKey()
         tone.releaseAll()
+        remoteKeyStartedAt.removeAll()
+        receivedMarks = []
         frequency = value
         UserDefaults.standard.set(value, forKey: "radio.frequency")
         startDiscovery()
@@ -45,6 +53,7 @@ final class RadioManager: NSObject, ObservableObject {
     func beginLocalKey() {
         guard !localKeyIsDown else { return }
         localKeyIsDown = true
+        localKeyStartedAt = ProcessInfo.processInfo.systemUptime
         isSending = true
         tone.keyDown(from: "local")
         send(action: "down", sender: peerID.displayName)
@@ -52,10 +61,22 @@ final class RadioManager: NSObject, ObservableObject {
 
     func endLocalKey() {
         guard localKeyIsDown else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        let duration = localKeyStartedAt.map { now - $0 } ?? 0
+        localKeyStartedAt = nil
         localKeyIsDown = false
         isSending = false
         tone.keyUp(from: "local")
-        send(action: "up", sender: peerID.displayName)
+        send(action: "up", sender: peerID.displayName, duration: duration)
+    }
+
+    private func recordReceivedMark(duration: TimeInterval) {
+        var marks = receivedMarks
+        marks.append(duration >= dashThreshold ? "—" : "·")
+        if marks.count > maxVisibleMarks {
+            marks.removeFirst(marks.count - maxVisibleMarks)
+        }
+        receivedMarks = marks
     }
 
     private static func normalizedFrequency(_ input: String) -> String? {
@@ -99,9 +120,9 @@ final class RadioManager: NSObject, ObservableObject {
         newBrowser.startBrowsingForPeers()
     }
 
-    private func send(action: String, sender: String) {
+    private func send(action: String, sender: String, duration: TimeInterval? = nil) {
         guard !session.connectedPeers.isEmpty,
-              let data = try? JSONEncoder().encode(MorsePacket(action: action, sender: sender)) else { return }
+              let data = try? JSONEncoder().encode(MorsePacket(action: action, sender: sender, duration: duration)) else { return }
         do {
             try session.send(data, toPeers: session.connectedPeers, with: .reliable)
         } catch {
@@ -146,6 +167,7 @@ extension RadioManager: MCSessionDelegate {
             guard let self else { return }
             if state != .connected {
                 self.tone.keyUp(from: peerID.displayName)
+                self.remoteKeyStartedAt.removeValue(forKey: peerID.displayName)
             }
             self.peerNames = session.connectedPeers.map(\.displayName).sorted()
         }
@@ -156,8 +178,16 @@ extension RadioManager: MCSessionDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             switch packet.action {
-            case "down": self.tone.keyDown(from: peerID.displayName)
-            case "up": self.tone.keyUp(from: peerID.displayName)
+            case "down":
+                self.remoteKeyStartedAt[peerID.displayName] = ProcessInfo.processInfo.systemUptime
+                self.tone.keyDown(from: peerID.displayName)
+            case "up":
+                self.tone.keyUp(from: peerID.displayName)
+                let fallbackDuration = self.remoteKeyStartedAt.removeValue(forKey: peerID.displayName)
+                    .map { ProcessInfo.processInfo.systemUptime - $0 }
+                if let duration = packet.duration ?? fallbackDuration {
+                    self.recordReceivedMark(duration: duration)
+                }
             default: break
             }
         }

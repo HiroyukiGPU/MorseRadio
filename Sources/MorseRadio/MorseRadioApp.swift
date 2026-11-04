@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 @main
@@ -18,20 +19,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let popover = NSPopover()
     private var keyEventMonitor: Any?
     private var isWaitingForSpace = false
+    private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
         if let button = statusItem.button {
-            button.image = nil
-            button.title = "· —"
+            button.image = NSImage(systemSymbolName: "dot.radiowaves.left.and.right", accessibilityDescription: "Morse Radio")
+            button.title = ""
             button.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .medium)
-            button.setAccessibilityLabel("Morse Radio, dot and dash")
+            button.setAccessibilityLabel("Morse Radio, received Morse signal")
             button.toolTip = "Morse Radio — 周波数 \(radio.frequency)"
             button.target = self
             button.action = #selector(statusItemClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
+
+        radio.$receivedMarks
+            .sink { [weak self] marks in
+                self?.updateStatusItem(marks: marks)
+            }
+            .store(in: &cancellables)
 
         popover.behavior = .transient
         popover.contentSize = NSSize(width: 300, height: 250)
@@ -89,6 +97,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item.target = self
         }
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY), in: button)
+    }
+
+    private func updateStatusItem(marks: [String]) {
+        let sequence = marks.joined(separator: " ")
+        statusItem.button?.title = sequence
+        statusItem.button?.toolTip = sequence.isEmpty
+            ? "Morse Radio — 周波数 \(radio.frequency)"
+            : "受信した信号: \(sequence) — 周波数 \(radio.frequency)"
     }
 
     @objc private func openFrequencySettings() {

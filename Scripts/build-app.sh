@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="$ROOT/MorseRadio.app"
-APP_VERSION="${APP_VERSION:-1.1.0}"
+APP_VERSION="${APP_VERSION:-1.2.0}"
 
 cd "$ROOT"
 swift build -c release
