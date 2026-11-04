@@ -1,16 +1,20 @@
 # Morse Radio
 
-A macOS menu bar Morse keyer written in Swift. Click the menu bar icon to open the key panel. Click the panel and hold **Space** to transmit a tone; a short press is a dot and a longer press is a dash. Right-click the menu bar icon to change the virtual frequency.
+Swift で作成した macOS メニューバー常駐のモールス信号キーヤーです。メニューバーのアイコンをクリックするとキー入力パネルが開きます。パネルをクリックしてから **Space** キーを押すとトーンを送信し、短く押すと短点、長押しすると長点になります。メニューバーのアイコンを右クリックすると仮想周波数を変更できます。
 
-## Build
+## ビルドと起動
 
-Requirements: macOS 13 or later and Xcode Command Line Tools.
+macOS 13 以降と Xcode Command Line Tools が必要です。
 
 ```sh
 ./Scripts/build-app.sh
 open MorseRadio.app
 ```
 
-The app advertises and discovers peers with Apple's MultipeerConnectivity framework. Devices need to be on the same local Wi-Fi/nearby network and use the exact same virtual frequency. The receiver plays the keyed 650 Hz tone locally. The app does not provide an Internet relay, decode Morse into text, or use licensed radio equipment/frequencies.
+## 通信について
 
-macOS may ask for Local Network access the first time the app searches for peers; allow it to discover other devices.
+Apple の MultipeerConnectivity を使って、周辺のアプリを検索・接続します。同じローカル Wi‑Fi などの近距離ネットワークに接続し、同じ仮想周波数を設定してください。受信側では、キー操作に合わせた 650 Hz のトーンを再生します。
+
+インターネット経由の中継や、モールス信号の文字起こしには対応していません。無線機や実際の無線周波数も使用しません。
+
+初回の検索時に macOS がローカルネットワークへのアクセスを確認する場合があります。他のアプリ利用者を見つけるにはアクセスを許可してください。
